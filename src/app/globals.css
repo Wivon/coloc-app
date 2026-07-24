@@ -1,0 +1,165 @@
+@import 'tailwindcss';
+
+/*
+ * Jetons de design. Une seule couleur d'accent, deux couleurs sémantiques
+ * (positif / négatif) et une échelle de gris chaude. Le thème sombre reprend les
+ * mêmes noms : aucun composant n'a besoin de connaître le mode courant.
+ */
+:root {
+  --bg: #fbfaf8;
+  --surface: #ffffff;
+  --surface-sunken: #f2f1ee;
+  --border: #e7e5e0;
+  --border-strong: #d6d3cc;
+  --fg: #17181a;
+  --fg-muted: #6c6f76;
+  --fg-subtle: #9a9da4;
+  --accent: #0f7b6c;
+  --accent-soft: #e3f2ee;
+  --accent-fg: #ffffff;
+  --positive: #0f7b6c;
+  --negative: #c2452d;
+
+  --avatar-moss: #4f7a52;
+  --avatar-clay: #b06b45;
+  --avatar-sky: #3f76ad;
+  --avatar-plum: #7d5590;
+  --avatar-amber: #b08422;
+  --avatar-teal: #2b8080;
+  --avatar-rose: #b25572;
+  --avatar-slate: #5f6672;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d0e10;
+    --surface: #17181b;
+    --surface-sunken: #202226;
+    --border: #26282d;
+    --border-strong: #35383e;
+    --fg: #ecedee;
+    --fg-muted: #9ba0a7;
+    --fg-subtle: #6e737b;
+    --accent: #35b79f;
+    --accent-soft: #14312c;
+    --accent-fg: #06231e;
+    --positive: #35b79f;
+    --negative: #e2705a;
+
+    --avatar-moss: #74a377;
+    --avatar-clay: #d0906c;
+    --avatar-sky: #6ea1d6;
+    --avatar-plum: #a681b6;
+    --avatar-amber: #d4ac53;
+    --avatar-teal: #55a8a8;
+    --avatar-rose: #d6829c;
+    --avatar-slate: #8b929d;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-sunken: var(--surface-sunken);
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+  --color-ink: var(--fg);
+  --color-muted: var(--fg-muted);
+  --color-subtle: var(--fg-subtle);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-fg: var(--accent-fg);
+  --color-positive: var(--positive);
+  --color-negative: var(--negative);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    /* Évite le rebond élastique sous la barre d'onglets sur iOS. */
+    overscroll-behavior-y: none;
+  }
+
+  body {
+    background-color: var(--bg);
+    color: var(--fg);
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button,
+  [role='button'] {
+    touch-action: manipulation;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  input,
+  select,
+  textarea {
+    /* iOS zoome sur les champs dont la police est sous 16px. */
+    font-size: max(1rem, 16px);
+  }
+
+  input[type='number']::-webkit-inner-spin-button,
+  input[type='number']::-webkit-outer-spin-button {
+    appearance: none;
+    margin: 0;
+  }
+}
+
+@layer utilities {
+  /* Les montants restent alignés colonne par colonne. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum';
+  }
+
+  .safe-bottom {
+    padding-bottom: max(env(safe-area-inset-bottom), 0.5rem);
+  }
+
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  @keyframes sheet-in {
+    from {
+      transform: translateY(16px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  .animate-sheet-in {
+    animation: sheet-in 0.24s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  .animate-fade-in {
+    animation: fade-in 0.18s ease-out;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-sheet-in,
+    .animate-fade-in {
+      animation: none;
+    }
+  }
+}
