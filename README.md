@@ -157,4 +157,6 @@ Rappel quotidien des tâches — à planifier une fois par jour :
 curl -H "Authorization: Bearer $CRON_SECRET" https://votre-domaine/api/cron/reminders
 ```
 
-Sur Vercel, ajoutez plutôt un cron dans la configuration du projet.
+Sur Vercel, ce cron est déjà déclaré dans `vercel.json` (tous les jours à 7h UTC).
+Si `CRON_SECRET` est défini dans les variables d'environnement du projet, Vercel
+l'envoie automatiquement en en-tête `Authorization: Bearer`.

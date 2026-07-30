@@ -21,27 +21,24 @@ export async function GET(request: Request) {
   const due = unwrap(
     await db()
       .from('chore_assignments')
-      .select('assignee_id, due_on, chores(title, emoji)')
+      .select('assignee_id, chores(title, emoji)')
       .is('completed_at', null)
       .lte('due_on', today())
-      .returns<{ assignee_id: Uuid; due_on: string; chores: Pick<ChoreRow, 'title' | 'emoji'> }[]>(),
+      .returns<{ assignee_id: Uuid; chores: Pick<ChoreRow, 'title' | 'emoji'> }[]>(),
   );
 
-  const byUser = new Map<Uuid, { titles: string[]; late: number }>();
+  const byUser = new Map<Uuid, string[]>();
   for (const row of due) {
-    const entry = byUser.get(row.assignee_id) ?? { titles: [], late: 0 };
-    entry.titles.push(`${row.chores.emoji} ${row.chores.title}`);
-    if (row.due_on < today()) entry.late += 1;
-    byUser.set(row.assignee_id, entry);
+    const titles = byUser.get(row.assignee_id) ?? [];
+    titles.push(`${row.chores.emoji} ${row.chores.title}`);
+    byUser.set(row.assignee_id, titles);
   }
 
   let sent = 0;
-  for (const [userId, entry] of byUser) {
+  for (const [userId, titles] of byUser) {
     sent += await notifyUsers([userId], {
-      title: entry.titles.length === 1 ? 'Une tâche t’attend' : `${entry.titles.length} tâches t’attendent`,
-      body:
-        entry.titles.slice(0, 3).join(' · ') +
-        (entry.late > 0 ? ` — ${entry.late} en retard` : ''),
+      title: 'Tâches pour aujourd’hui',
+      body: titles.join(', '),
       url: '/tasks',
       tag: 'daily-reminder',
     });
