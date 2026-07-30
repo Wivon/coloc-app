@@ -1,22 +1,15 @@
 'use client';
 
-import { useActionState } from 'react';
-
 import { renameHouseholdAction } from '@/actions/household';
 import { Avatar } from '@/components/ui/Avatar';
 import { Card } from '@/components/ui/Card';
 import { Field, FormError, Input } from '@/components/ui/Field';
 import { SubmitButton } from '@/components/ui/SubmitButton';
-import type { ActionResult } from '@/lib/action-result';
+import { useFormAction } from '@/lib/use-form-action';
 import type { Member } from '@/lib/domain/households';
 
-const initial: ActionResult<void> | null = null;
-
 export function HouseholdCard({ name, members }: { name: string; members: Member[] }) {
-  const [state, submit] = useActionState(
-    (_state: typeof initial, formData: FormData) => renameHouseholdAction(formData),
-    initial,
-  );
+  const { submit, error } = useFormAction(renameHouseholdAction);
 
   return (
     <Card>
@@ -26,7 +19,7 @@ export function HouseholdCard({ name, members }: { name: string; members: Member
         <Field label="Nom">
           <Input name="name" defaultValue={name} required minLength={2} />
         </Field>
-        {!state?.ok && <FormError>{state?.error}</FormError>}
+        <FormError>{error}</FormError>
         <SubmitButton size="md" variant="secondary" pendingLabel="Enregistrement…">
           Renommer
         </SubmitButton>

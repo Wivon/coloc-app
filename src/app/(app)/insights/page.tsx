@@ -1,12 +1,15 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 
-import { PageHeader } from '@/components/PageHeader';
+import { AppHeader } from '@/components/AppHeader';
 import { MonthNav } from '@/components/insights/MonthNav';
 import { TrendChart } from '@/components/insights/TrendChart';
 import { Amount } from '@/components/ui/Amount';
 import { Avatar } from '@/components/ui/Avatar';
 import { Card, CardList, SectionTitle } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { InsightsContentSkeleton } from '@/components/PageSkeletons';
+import { HeaderSkeleton } from '@/components/ui/Skeleton';
 import { category } from '@/lib/categories';
 import { formatShortDate, monthKey, today } from '@/lib/date';
 import { formatMoney } from '@/lib/money';
@@ -16,10 +19,26 @@ import { requireHouseholdContext } from '@/lib/domain/households';
 export const metadata: Metadata = { title: 'Insights' };
 
 export default async function InsightsPage(props: PageProps<'/insights'>) {
-  const { household, user, members } = await requireHouseholdContext();
   const searchParams = await props.searchParams;
-
   const month = normalizeMonth(searchParams.m);
+
+  return (
+    <>
+      <Suspense fallback={<HeaderSkeleton title="Insights" />}>
+        <AppHeader title="Insights" />
+      </Suspense>
+
+      {/* La clé remonte le squelette à chaque changement de mois, plutôt que de
+          laisser l'ancien mois affiché pendant le chargement du nouveau. */}
+      <Suspense key={month} fallback={<InsightsContentSkeleton />}>
+        <InsightsContent month={month} />
+      </Suspense>
+    </>
+  );
+}
+
+async function InsightsContent({ month }: { month: string }) {
+  const { household, members } = await requireHouseholdContext();
   const insights = await getInsights(
     household.id,
     members.map((member) => member.id),
@@ -31,8 +50,6 @@ export default async function InsightsPage(props: PageProps<'/insights'>) {
 
   return (
     <>
-      <PageHeader title="Insights" subtitle={household.name} user={user} />
-
       <div className="flex flex-col gap-6">
         <Card>
           <MonthNav month={month} />
@@ -200,6 +217,7 @@ function Stat({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+
 
 /** N'accepte qu'un 'YYYY-MM' passé ou courant. */
 function normalizeMonth(value: string | string[] | undefined): string {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { addChoreAction } from '@/actions/chores';
 import { Button } from '@/components/ui/Button';
@@ -8,7 +8,7 @@ import { Chip } from '@/components/ui/Chip';
 import { Field, FormError, Input } from '@/components/ui/Field';
 import { Sheet } from '@/components/ui/Sheet';
 import { SubmitButton } from '@/components/ui/SubmitButton';
-import type { ActionResult } from '@/lib/action-result';
+import { useFormAction } from '@/lib/use-form-action';
 
 /** Modèles courants : un appui suffit pour créer la tâche. */
 const PRESETS = [
@@ -36,30 +36,18 @@ const EFFORTS = [
   { value: 3, label: 'Costaud' },
 ];
 
-const initial: ActionResult<void> | null = null;
-
-export function AddChoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+/** Monté uniquement quand la feuille est ouverte (voir `AddChoreButton`). */
+export function AddChoreSheet({ onClose }: { onClose: () => void }) {
   const [title, setTitle] = useState('');
   const [emoji, setEmoji] = useState('🧽');
   const [frequencyDays, setFrequencyDays] = useState(7);
   const [effort, setEffort] = useState(2);
 
-  const [state, submit] = useActionState(
-    (_state: typeof initial, formData: FormData) => addChoreAction(formData),
-    initial,
-  );
-
-  useEffect(() => {
-    if (state?.ok) {
-      setTitle('');
-      setEmoji('🧽');
-      onClose();
-    }
-  }, [state, onClose]);
+  const { submit, error } = useFormAction(addChoreAction, onClose);
 
   return (
     <Sheet
-      open={open}
+      open
       onClose={onClose}
       title="Nouvelle tâche"
       description="Elle sera répartie automatiquement entre les colocs, à chaque échéance."
@@ -148,7 +136,7 @@ export function AddChoreSheet({ open, onClose }: { open: boolean; onClose: () =>
           </div>
         </div>
 
-        {!state?.ok && <FormError>{state?.error}</FormError>}
+        <FormError>{error}</FormError>
 
         <div className="flex flex-col gap-2 pt-1">
           <SubmitButton pendingLabel="Ajout…">Ajouter la tâche</SubmitButton>

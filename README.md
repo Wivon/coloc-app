@@ -76,6 +76,51 @@ Quelques règles pour ajouter une fonctionnalité :
 4. **Passer par `requireHouseholdContext()`** dans toute page authentifiée :
    c'est ce qui garantit que l'utilisateur appartient bien à la colocation.
 
+### Formulaires : `useFormAction`, jamais un effet
+
+Un formulaire branché sur une Server Action utilise
+[`useFormAction`](src/lib/use-form-action.ts), qui appelle `onSuccess` **dans le
+flux de soumission**.
+
+N'utilisez pas `useActionState` + `useEffect` pour réagir au succès : le résultat
+de `useActionState` est « collant » (il survit à tous les rendus suivants), et
+comme les callbacks inline changent d'identité à chaque rendu du parent, l'effet
+se redéclenche et rejoue son action — ce qui refermait la feuille aussitôt
+rouverte après un premier ajout.
+
+Les feuilles à formulaire sont en plus **montées conditionnellement**
+(`{open ? <Sheet…/> : null}`) : leur état repart de zéro à chaque ouverture.
+
+### Navigation instantanée
+
+Le changement d'onglet doit être immédiat. Trois règles s'y appliquent :
+
+- **La mise en page `(app)/layout.tsx` reste synchrone.** Une mise en page qui
+  lit des données non cachées bloque la navigation côté client : le fallback de
+  `loading.tsx` ne peut pas s'afficher tant qu'elle n'a pas fini. L'autorisation
+  est portée par chaque page, via `requireHouseholdContext()`.
+- **Chaque page rend sa structure sans `await` au niveau racine**, et place ses
+  données sous `<Suspense>`. L'en-tête et le contenu arrivent indépendamment.
+- **Chaque route a un `loading.tsx`** qui affiche le même squelette que le
+  fallback interne (voir `components/PageSkeletons.tsx`). C'est aussi ce qui rend
+  le prefetch utile : pour une route dynamique, `<Link>` ne précharge que jusqu'à
+  la frontière `loading.js` la plus proche.
+
+Mesuré en production sur les 4 onglets : premier octet à ~10 ms (coquille +
+squelette), données complètes entre 340 et 600 ms. Le squelette apparaît 6 à 9 ms
+après le clic.
+
+> Le prefetch de `<Link>` **n'est actif qu'en production**. En `npm run dev`, le
+> changement d'onglet paraîtra toujours plus lent — mesurez avec
+> `npm run build && npm start`.
+
+Aucune donnée n'est mise en cache côté serveur pour l'instant, et c'est
+délibéré : soldes et dépenses changent à chaque mutation, et afficher un solde
+périmé serait le pire défaut possible pour cette app. `use cache` interdit par
+ailleurs `cookies()`, dont dépend toute la couche domaine. Si le besoin apparaît,
+le bon candidat est `getInsights()` sur un **mois passé** : ces données-là ne
+changent plus.
+
 ### Répartition automatique des tâches
 
 Une tâche porte une cadence (`frequency_days`) et un poids (`effort`, 1 à 5).

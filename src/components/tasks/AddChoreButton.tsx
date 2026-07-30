@@ -11,7 +11,9 @@ export function AddChoreButton() {
   return (
     <>
       <PlusButton label="Nouvelle tâche" onClick={() => setOpen(true)} />
-      <AddChoreSheet open={open} onClose={() => setOpen(false)} />
+      {/* Montage conditionnel : la feuille repart d'un état vierge à chaque
+          ouverture, et aucun état de soumission ne peut survivre à sa fermeture. */}
+      {open ? <AddChoreSheet onClose={() => setOpen(false)} /> : null}
     </>
   );
 }

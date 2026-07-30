@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { settleAction } from '@/actions/settlements';
 import { Avatar } from '@/components/ui/Avatar';
@@ -10,20 +10,19 @@ import { Field, FormError, Input } from '@/components/ui/Field';
 import { Sheet } from '@/components/ui/Sheet';
 import { SubmitButton } from '@/components/ui/SubmitButton';
 import { centsToInput } from '@/lib/money';
-import type { ActionResult } from '@/lib/action-result';
+import { useFormAction } from '@/lib/use-form-action';
 import type { Transfer } from '@/lib/domain/balance-math';
 import type { Member } from '@/lib/domain/households';
 
-const initial: ActionResult<void> | null = null;
-
-/** Saisie manuelle d'un remboursement (virement fait hors de l'app, espèces…). */
+/**
+ * Saisie manuelle d'un remboursement (virement hors de l'app, espèces…).
+ * Monté uniquement quand la feuille est ouverte (voir `BalancesView`).
+ */
 export function SettleSheet({
-  open,
   onClose,
   members,
   suggestions,
 }: {
-  open: boolean;
   onClose: () => void;
   members: Member[];
   /** Virements calculés, proposés en un tap. */
@@ -32,21 +31,11 @@ export function SettleSheet({
   const [toUserId, setToUserId] = useState(members[0]?.id ?? '');
   const [amount, setAmount] = useState('');
 
-  const [state, submit] = useActionState(
-    (_state: typeof initial, formData: FormData) => settleAction(formData),
-    initial,
-  );
-
-  useEffect(() => {
-    if (state?.ok) {
-      setAmount('');
-      onClose();
-    }
-  }, [state, onClose]);
+  const { submit, error } = useFormAction(settleAction, onClose);
 
   if (members.length === 0) {
     return (
-      <Sheet open={open} onClose={onClose} title="Remboursement">
+      <Sheet open onClose={onClose} title="Remboursement">
         <p className="text-[14px] text-muted">
           Vous êtes seul dans la colocation pour le moment.
         </p>
@@ -56,7 +45,7 @@ export function SettleSheet({
 
   return (
     <Sheet
-      open={open}
+      open
       onClose={onClose}
       title="J’ai remboursé"
       description="Le montant est déduit de ton solde, rien n’est supprimé de l’historique."
@@ -106,7 +95,7 @@ export function SettleSheet({
           <Input name="note" placeholder="Virement" maxLength={80} />
         </Field>
 
-        {!state?.ok && <FormError>{state?.error}</FormError>}
+        <FormError>{error}</FormError>
 
         <div className="flex flex-col gap-2">
           <SubmitButton pendingLabel="Enregistrement…">

@@ -23,13 +23,16 @@ export function AddExpenseButton({
   return (
     <>
       <PlusButton label="Nouvelle dépense" onClick={() => setOpen(true)} />
-      <AddExpenseSheet
-        open={open}
-        onClose={() => setOpen(false)}
-        members={members}
-        currentUserId={currentUserId}
-        currency={currency}
-      />
+      {/* Montage conditionnel : la feuille repart d'un état vierge à chaque
+          ouverture, et aucun état de soumission ne peut survivre à sa fermeture. */}
+      {open ? (
+        <AddExpenseSheet
+          onClose={() => setOpen(false)}
+          members={members}
+          currentUserId={currentUserId}
+          currency={currency}
+        />
+      ) : null}
     </>
   );
 }

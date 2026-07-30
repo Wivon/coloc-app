@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { addExpenseAction } from '@/actions/expenses';
 import { Avatar } from '@/components/ui/Avatar';
@@ -13,19 +13,19 @@ import { EXPENSE_CATEGORIES } from '@/lib/categories';
 import { cn } from '@/lib/cn';
 import { today } from '@/lib/date';
 import { formatMoney, parseAmountToCents, splitEvenly } from '@/lib/money';
-import type { ActionResult } from '@/lib/action-result';
+import { useFormAction } from '@/lib/use-form-action';
 import type { Member } from '@/lib/domain/households';
 
-const initial: ActionResult<void> | null = null;
-
+/**
+ * Monté uniquement quand la feuille est ouverte (voir `AddExpenseButton`) : la
+ * saisie repart donc de zéro à chaque ouverture, sans code de remise à zéro.
+ */
 export function AddExpenseSheet({
-  open,
   onClose,
   members,
   currentUserId,
   currency,
 }: {
-  open: boolean;
   onClose: () => void;
   members: Member[];
   currentUserId: string;
@@ -39,19 +39,7 @@ export function AddExpenseSheet({
   // Par défaut, tout le monde partage.
   const [participants, setParticipants] = useState<string[]>(allIds);
 
-  const [state, submit] = useActionState(
-    (_state: typeof initial, formData: FormData) => addExpenseAction(formData),
-    initial,
-  );
-
-  useEffect(() => {
-    if (!state?.ok) return;
-    // Formulaire remis à zéro pour la prochaine dépense.
-    setAmount('');
-    setParticipants(members.map((member) => member.id));
-    setPayerId(currentUserId);
-    onClose();
-  }, [state, onClose, currentUserId, members]);
+  const { submit, error } = useFormAction(addExpenseAction, onClose);
 
   const amountCents = parseAmountToCents(amount) ?? 0;
   const shareCents =
@@ -64,7 +52,7 @@ export function AddExpenseSheet({
   }
 
   return (
-    <Sheet open={open} onClose={onClose} title="Nouvelle dépense">
+    <Sheet open onClose={onClose} title="Nouvelle dépense">
       <form action={submit} className="flex flex-col gap-5">
         <div className="flex flex-col items-center gap-1 pb-1">
           <div className="flex items-baseline gap-1">
@@ -184,7 +172,7 @@ export function AddExpenseSheet({
           <Input type="date" name="spentOn" defaultValue={today()} max={today()} />
         </Field>
 
-        {!state?.ok && <FormError>{state?.error}</FormError>}
+        <FormError>{error}</FormError>
 
         <div className="flex flex-col gap-2">
           <SubmitButton pendingLabel="Enregistrement…">Ajouter la dépense</SubmitButton>

@@ -1,9 +1,12 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 
-import { PageHeader } from '@/components/PageHeader';
+import { AppHeader } from '@/components/AppHeader';
 import { AddChoreButton } from '@/components/tasks/AddChoreButton';
 import { TasksView } from '@/components/tasks/TasksView';
 import { WorkloadCard } from '@/components/tasks/WorkloadCard';
+import { TasksContentSkeleton } from '@/components/PageSkeletons';
+import { HeaderSkeleton } from '@/components/ui/Skeleton';
 import { addDays, today } from '@/lib/date';
 import {
   generateSchedule,
@@ -15,11 +18,30 @@ import { requireHouseholdContext } from '@/lib/domain/households';
 
 export const metadata: Metadata = { title: 'Tâches' };
 
-export default async function TasksPage() {
+/**
+ * La page est synchrone : elle rend sa structure immédiatement et laisse
+ * l'en-tête et la liste arriver indépendamment sous leurs `Suspense`. C'est ce
+ * qui rend le changement d'onglet instantané.
+ */
+export default function TasksPage() {
+  return (
+    <>
+      <Suspense fallback={<HeaderSkeleton title="Tâches" />}>
+        <AppHeader title="Tâches" action={<AddChoreButton />} />
+      </Suspense>
+
+      <Suspense fallback={<TasksContentSkeleton />}>
+        <TasksContent />
+      </Suspense>
+    </>
+  );
+}
+
+async function TasksContent() {
   const { household, user, members } = await requireHouseholdContext();
 
-  // Complète l'horizon de planification à l'ouverture de la page. L'opération est
-  // idempotente : elle ne touche pas aux échéances déjà attribuées.
+  // Complète l'horizon de planification. Idempotent : n'écrit que s'il manque
+  // des échéances. Placé sous le `Suspense`, il ne retarde plus l'affichage.
   await generateSchedule(household.id);
 
   const [items, workload] = await Promise.all([
@@ -31,13 +53,10 @@ export default async function TasksPage() {
   ]);
 
   return (
-    <>
-      <PageHeader title="Tâches" subtitle={household.name} action={<AddChoreButton />} user={user} />
-
-      <div className="flex flex-col gap-6">
-        <TasksView items={items} members={members} currentUserId={user.id} />
-        {items.length > 0 && <WorkloadCard workload={workload} />}
-      </div>
-    </>
+    <div className="flex flex-col gap-6">
+      <TasksView items={items} members={members} currentUserId={user.id} />
+      {items.length > 0 ? <WorkloadCard workload={workload} /> : null}
+    </div>
   );
 }
+

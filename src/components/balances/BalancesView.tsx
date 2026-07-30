@@ -189,12 +189,14 @@ export function BalancesView({
         </CardList>
       </section>
 
-      <SettleSheet
-        open={sheetOpen}
-        onClose={() => setSheetOpen(false)}
-        members={members.filter((member) => member.id !== currentUserId)}
-        suggestions={iOwe}
-      />
+      {/* Montage conditionnel : voir `AddExpenseButton`. */}
+      {sheetOpen ? (
+        <SettleSheet
+          onClose={() => setSheetOpen(false)}
+          members={members.filter((member) => member.id !== currentUserId)}
+          suggestions={iOwe}
+        />
+      ) : null}
     </div>
   );
 }

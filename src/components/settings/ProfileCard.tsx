@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useState } from 'react';
 
 import { updateProfileAction } from '@/actions/household';
 import { Avatar } from '@/components/ui/Avatar';
@@ -9,9 +9,7 @@ import { Field, FormError, Input } from '@/components/ui/Field';
 import { SubmitButton } from '@/components/ui/SubmitButton';
 import { AVATAR_COLORS } from '@/lib/avatar';
 import { cn } from '@/lib/cn';
-import type { ActionResult } from '@/lib/action-result';
-
-const initial: ActionResult<void> | null = null;
+import { useFormAction } from '@/lib/use-form-action';
 
 export function ProfileCard({
   userId,
@@ -26,11 +24,9 @@ export function ProfileCard({
 }) {
   const [color, setColor] = useState(avatarColor);
   const [name, setName] = useState(displayName);
+  const [saved, setSaved] = useState(false);
 
-  const [state, submit] = useActionState(
-    (_state: typeof initial, formData: FormData) => updateProfileAction(formData),
-    initial,
-  );
+  const { submit, error } = useFormAction(updateProfileAction, () => setSaved(true));
 
   return (
     <Card>
@@ -45,7 +41,10 @@ export function ProfileCard({
               <Input
                 name="displayName"
                 value={name}
-                onChange={(event) => setName(event.target.value)}
+                onChange={(event) => {
+                  setName(event.target.value);
+                  setSaved(false);
+                }}
                 required
                 minLength={1}
               />
@@ -63,7 +62,10 @@ export function ProfileCard({
                 type="button"
                 aria-label={option}
                 aria-pressed={color === option}
-                onClick={() => setColor(option)}
+                onClick={() => {
+                  setColor(option);
+                  setSaved(false);
+                }}
                 className={cn(
                   'size-8 rounded-full transition',
                   color === option ? 'ring-2 ring-ink ring-offset-2 ring-offset-surface' : '',
@@ -74,8 +76,8 @@ export function ProfileCard({
           </div>
         </div>
 
-        {!state?.ok && <FormError>{state?.error}</FormError>}
-        {state?.ok && <p className="text-[13px] text-positive">Profil mis à jour.</p>}
+        <FormError>{error}</FormError>
+        {saved ? <p className="text-[13px] text-positive">Profil mis à jour.</p> : null}
 
         <SubmitButton size="md" variant="secondary" pendingLabel="Enregistrement…">
           Enregistrer
