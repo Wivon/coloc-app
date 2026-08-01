@@ -27,7 +27,6 @@ export function ExpensesView({
   currency: string;
 }) {
   const [selected, setSelected] = useState<Expense | null>(null);
-  const [pending, startTransition] = useTransition();
 
   const membersById = useMemo(
     () => new Map(members.map((member) => [member.id, member])),
@@ -152,22 +151,76 @@ export function ExpensesView({
               </ul>
             </div>
 
-            <Button
-              variant="danger"
-              size="lg"
-              disabled={pending}
-              onClick={() =>
-                startTransition(async () => {
-                  await deleteExpenseAction(selected.id);
-                  setSelected(null);
-                })
-              }
-            >
-              {pending ? 'Suppression…' : 'Supprimer la dépense'}
-            </Button>
+            <DeleteExpenseButton
+              expenseId={selected.id}
+              onDeleted={() => setSelected(null)}
+            />
           </div>
         )}
       </Sheet>
+    </div>
+  );
+}
+
+/**
+ * Supprime une dépense, en deux temps.
+ *
+ * Le bouton est à portée de pouce dans une feuille qu'on ouvre surtout pour
+ * consulter la répartition, et la suppression réécrit le solde de tous les colocs
+ * sans retour possible : elle mérite au moins autant de garde-fou que l'arrêt
+ * d'une tâche (voir `DeleteChoreButton`).
+ */
+function DeleteExpenseButton({
+  expenseId,
+  onDeleted,
+}: {
+  expenseId: string;
+  onDeleted: () => void;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  if (!confirming) {
+    return (
+      <Button variant="danger" size="lg" onClick={() => setConfirming(true)}>
+        Supprimer la dépense
+      </Button>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-2 rounded-2xl bg-sunken p-3">
+      <p className="text-[13px] leading-relaxed text-muted">
+        La dépense et sa répartition disparaissent, et les soldes de toute la coloc sont
+        recalculés. C’est définitif.
+      </p>
+      {error ? <p className="text-[13px] text-negative">{error}</p> : null}
+      <div className="flex gap-2">
+        <Button
+          variant="danger"
+          size="md"
+          className="flex-1"
+          disabled={pending}
+          onClick={() =>
+            startTransition(async () => {
+              const result = await deleteExpenseAction(expenseId);
+              if (result.ok) onDeleted();
+              else setError(result.error);
+            })
+          }
+        >
+          {pending ? 'Suppression…' : 'Confirmer'}
+        </Button>
+        <Button
+          variant="secondary"
+          size="md"
+          className="flex-1"
+          onClick={() => setConfirming(false)}
+        >
+          Annuler
+        </Button>
+      </div>
     </div>
   );
 }

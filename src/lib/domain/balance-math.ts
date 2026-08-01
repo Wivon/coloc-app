@@ -36,33 +36,61 @@ export interface Transfer {
   amountCents: number;
 }
 
+/** Totaux déjà agrégés pour une personne, dans l'ordre des colonnes de `Balance`. */
+export type UserTotals = Omit<Balance, 'netCents'>;
+
+/**
+ * Assemble les soldes à partir de totaux déjà agrégés.
+ *
+ * C'est le point de passage unique du calcul de `netCents`, qu'ils viennent d'une
+ * agrégation SQL (`household_balances`) ou d'un calcul en mémoire
+ * (`computeBalances`) : les deux chemins ne peuvent pas diverger.
+ */
+export function balancesFromTotals(memberIds: Uuid[], totals: UserTotals[]): Balance[] {
+  const byUser = new Map<Uuid, Balance>(memberIds.map((userId) => [userId, empty(userId)]));
+
+  for (const total of totals) {
+    // Un ancien coloc peut apparaître dans l'historique sans être membre.
+    let balance = byUser.get(total.userId);
+    if (!balance) {
+      balance = empty(total.userId);
+      byUser.set(total.userId, balance);
+    }
+
+    balance.paidCents += total.paidCents;
+    balance.owedCents += total.owedCents;
+    balance.settledOutCents += total.settledOutCents;
+    balance.settledInCents += total.settledInCents;
+  }
+
+  for (const balance of byUser.values()) {
+    balance.netCents =
+      balance.paidCents - balance.owedCents + balance.settledOutCents - balance.settledInCents;
+  }
+
+  return [...byUser.values()];
+}
+
+/**
+ * Agrégation en mémoire, à partir de l'historique complet.
+ *
+ * Sur une colocation réelle les soldes viennent de `household_balances` — remonter
+ * toutes les dépenses ne passe pas à l'échelle. Cette version reste la définition
+ * exécutable du modèle, et c'est elle que couvrent les tests.
+ */
 export function computeBalances(
   memberIds: Uuid[],
   expenses: BalanceInputExpense[],
   settlements: BalanceInputSettlement[],
 ): Balance[] {
-  const byUser = new Map<Uuid, Balance>(
-    memberIds.map((userId) => [
-      userId,
-      { userId, paidCents: 0, owedCents: 0, settledOutCents: 0, settledInCents: 0, netCents: 0 },
-    ]),
-  );
-
+  const totals = new Map<Uuid, UserTotals>();
   const ensure = (userId: Uuid) => {
-    let balance = byUser.get(userId);
-    if (!balance) {
-      // Un ancien coloc peut apparaître dans l'historique sans être membre.
-      balance = {
-        userId,
-        paidCents: 0,
-        owedCents: 0,
-        settledOutCents: 0,
-        settledInCents: 0,
-        netCents: 0,
-      };
-      byUser.set(userId, balance);
+    let total = totals.get(userId);
+    if (!total) {
+      total = { userId, paidCents: 0, owedCents: 0, settledOutCents: 0, settledInCents: 0 };
+      totals.set(userId, total);
     }
-    return balance;
+    return total;
   };
 
   for (const expense of expenses) {
@@ -75,13 +103,17 @@ export function computeBalances(
     ensure(settlement.toUserId).settledInCents += settlement.amountCents;
   }
 
-  for (const balance of byUser.values()) {
-    balance.netCents =
-      balance.paidCents - balance.owedCents + balance.settledOutCents - balance.settledInCents;
-  }
-
-  return [...byUser.values()];
+  return balancesFromTotals(memberIds, [...totals.values()]);
 }
+
+const empty = (userId: Uuid): Balance => ({
+  userId,
+  paidCents: 0,
+  owedCents: 0,
+  settledOutCents: 0,
+  settledInCents: 0,
+  netCents: 0,
+});
 
 /**
  * Réduit les soldes au plus petit nombre de virements possible.

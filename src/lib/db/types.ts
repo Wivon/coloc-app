@@ -117,6 +117,33 @@ export type SettlementRow = {
   settled_on: IsoDate;
   created_by: Uuid;
   created_at: IsoTimestamp;
+  /** Jeton d'intention du client : rejouer le même enregistrement ne duplique pas. */
+  client_token: Uuid;
+};
+
+/** Une ligne de `household_balances()` — totaux agrégés en base. */
+export type HouseholdBalanceRow = {
+  user_id: Uuid;
+  paid_cents: number;
+  owed_cents: number;
+  settled_out_cents: number;
+  settled_in_cents: number;
+};
+
+/** Entrée de `create_expense_with_shares()`. */
+export type ShareInput = {
+  user_id: Uuid;
+  amount_cents: number;
+};
+
+/** Entrée de `record_settlements()`. `client_token` absent → la base en tire un. */
+export type SettlementInput = {
+  from_user_id: Uuid;
+  to_user_id: Uuid;
+  amount_cents: number;
+  note: string | null;
+  settled_on: IsoDate;
+  client_token: Uuid | null;
 };
 
 export type PushSubscriptionRow = {
@@ -168,7 +195,7 @@ export type Database = {
       chore_assignments: TableDef<ChoreAssignmentRow>;
       expenses: TableDef<ExpenseRow, 'category' | 'spent_on'>;
       expense_shares: TableDef<ExpenseShareRow>;
-      settlements: TableDef<SettlementRow, 'settled_on'>;
+      settlements: TableDef<SettlementRow, 'settled_on' | 'client_token'>;
       push_subscriptions: TableDef<PushSubscriptionRow>;
     };
     Views: Record<string, never>;
@@ -176,6 +203,32 @@ export type Database = {
       delete_expired_webauthn_challenges: {
         Args: Record<string, never>;
         Returns: undefined;
+      };
+      create_expense_with_shares: {
+        Args: {
+          p_id: Uuid;
+          p_household_id: Uuid;
+          p_payer_id: Uuid;
+          p_amount_cents: number;
+          p_description: string;
+          p_category: string;
+          p_spent_on: IsoDate;
+          p_created_by: Uuid;
+          p_shares: ShareInput[];
+        };
+        Returns: ExpenseRow;
+      };
+      household_balances: {
+        Args: { p_household_id: Uuid };
+        Returns: HouseholdBalanceRow[];
+      };
+      record_settlements: {
+        Args: {
+          p_household_id: Uuid;
+          p_created_by: Uuid;
+          p_settlements: SettlementInput[];
+        };
+        Returns: SettlementRow[];
       };
     };
     Enums: Record<string, never>;

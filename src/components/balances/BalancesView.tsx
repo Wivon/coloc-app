@@ -7,8 +7,11 @@ import { Amount } from '@/components/ui/Amount';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { Card, CardList, SectionTitle } from '@/components/ui/Card';
+import { FormError } from '@/components/ui/Field';
 import { SettleSheet } from './SettleSheet';
+import { newClientToken } from '@/lib/client-token';
 import { formatMoney } from '@/lib/money';
+import type { ActionResult } from '@/lib/action-result';
 import type { Balance, Transfer } from '@/lib/domain/balance-math';
 import type { Member } from '@/lib/domain/households';
 
@@ -25,9 +28,11 @@ export function BalancesView({
   currentUserId: string;
   currency: string;
 }) {
-  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  // L'erreur porte sa provenance : affichée au mauvais endroit, elle serait hors
+  // écran — la liste « À rembourser » est loin du résumé, sur un téléphone.
+  const [error, setError] = useState<{ scope: 'all' | 'transfer'; message: string } | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [, startTransition] = useTransition();
 
   const membersById = useMemo(
     () => new Map(members.map((member) => [member.id, member])),
@@ -41,22 +46,6 @@ export function BalancesView({
   const others = transfers.filter(
     (transfer) => transfer.fromUserId !== currentUserId && transfer.toUserId !== currentUserId,
   );
-
-  function settle(transfer: Transfer) {
-    setPendingId(transfer.toUserId);
-    startTransition(async () => {
-      await settleTransferAction(transfer.toUserId, transfer.amountCents);
-      setPendingId(null);
-    });
-  }
-
-  function settleEverything() {
-    setPendingId('all');
-    startTransition(async () => {
-      await settleAllAction();
-      setPendingId(null);
-    });
-  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -82,16 +71,27 @@ export function BalancesView({
 
         <div className="mt-4 flex flex-col gap-2">
           {iOwe.length > 0 && (
-            <Button size="lg" disabled={pendingId !== null} onClick={settleEverything}>
-              {pendingId === 'all'
-                ? 'Enregistrement…'
-                : `Tout régler · ${formatMoney(-myNet, currency)}`}
-            </Button>
+            <SettleButton
+              busy={busy}
+              onBusy={setBusy}
+              onError={(message) => setError(message ? { scope: 'all', message } : null)}
+              run={() => settleAllAction()}
+              label={`Tout régler · ${formatMoney(-myNet, currency)}`}
+              pendingLabel="Enregistrement…"
+              size="lg"
+            />
           )}
-          <Button variant="secondary" size="lg" onClick={() => setSheetOpen(true)}>
+          <Button
+            variant="secondary"
+            size="lg"
+            disabled={busy}
+            onClick={() => setSheetOpen(true)}
+          >
             Saisir un remboursement
           </Button>
         </div>
+
+        <FormError>{error?.scope === 'all' ? error.message : null}</FormError>
       </Card>
 
       {iOwe.length > 0 && (
@@ -108,18 +108,27 @@ export function BalancesView({
                 amountCents={transfer.amountCents}
                 currency={currency}
                 action={
-                  <Button
-                    variant="secondary"
+                  <SettleButton
+                    busy={busy}
+                    onBusy={setBusy}
+                    onError={(message) => setError(message ? { scope: 'transfer', message } : null)}
+                    run={(token) =>
+                      settleTransferAction(transfer.toUserId, transfer.amountCents, token)
+                    }
+                    label="Payé"
+                    pendingLabel="…"
                     size="sm"
-                    disabled={pendingId !== null}
-                    onClick={() => settle(transfer)}
-                  >
-                    {pendingId === transfer.toUserId ? '…' : 'Payé'}
-                  </Button>
+                    variant="secondary"
+                  />
                 }
               />
             ))}
           </CardList>
+          {error?.scope === 'transfer' ? (
+            <div className="mt-2">
+              <FormError>{error.message}</FormError>
+            </div>
+          ) : null}
         </section>
       )}
 
@@ -198,6 +207,64 @@ export function BalancesView({
         />
       ) : null}
     </div>
+  );
+}
+
+/**
+ * Bouton qui enregistre un remboursement.
+ *
+ * Le jeton d'intention appartient à ce bouton et n'est renouvelé qu'après un
+ * succès : renvoyer la même intention — double tap, reprise après une coupure —
+ * met à jour la ligne déjà écrite au lieu d'enregistrer un second remboursement.
+ */
+function SettleButton({
+  busy,
+  onBusy,
+  onError,
+  run,
+  label,
+  pendingLabel,
+  size,
+  variant,
+}: {
+  busy: boolean;
+  onBusy: (value: boolean) => void;
+  onError: (value: string | null) => void;
+  run: (token: string) => Promise<ActionResult<unknown>>;
+  label: string;
+  pendingLabel: string;
+  size: 'sm' | 'lg';
+  variant?: 'secondary';
+}) {
+  const [token, setToken] = useState(newClientToken);
+  const [pending, startTransition] = useTransition();
+
+  return (
+    <Button
+      variant={variant}
+      size={size}
+      disabled={busy}
+      onClick={() => {
+        onError(null);
+        onBusy(true);
+        startTransition(async () => {
+          // `attempt` ne rattrape que ce qui est levé *dans* l'action : une réponse
+          // perdue ou une 500 rejette ici. Sans ce `finally`, `busy` resterait vrai
+          // et tous les boutons de la page seraient désactivés jusqu'au rechargement.
+          try {
+            const result = await run(token);
+            if (result.ok) setToken(newClientToken());
+            else onError(result.error);
+          } catch {
+            onError('Enregistrement impossible. Vérifie ta connexion et réessaie.');
+          } finally {
+            onBusy(false);
+          }
+        });
+      }}
+    >
+      {pending ? pendingLabel : label}
+    </Button>
   );
 }
 

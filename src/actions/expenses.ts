@@ -5,10 +5,13 @@ import { revalidatePath } from 'next/cache';
 import { attempt, type ActionResult } from '@/lib/action-result';
 import { isExpenseCategory } from '@/lib/categories';
 import { formatMoney, parseAmountToCents } from '@/lib/money';
-import { today } from '@/lib/date';
+import { addDays, isIsoDate, today } from '@/lib/date';
 import { createExpense, deleteExpense } from '@/lib/domain/expenses';
 import { requireHouseholdContext } from '@/lib/domain/households';
 import { notifyInBackground } from '@/lib/domain/push';
+
+/** Aligné sur le `maxLength` du champ ; le formulaire n'engage que le navigateur. */
+const MAX_DESCRIPTION_LENGTH = 120;
 
 export async function addExpenseAction(formData: FormData): Promise<ActionResult<void>> {
   return attempt(async () => {
@@ -19,10 +22,21 @@ export async function addExpenseAction(formData: FormData): Promise<ActionResult
 
     const description = String(formData.get('description') ?? '').trim();
     if (!description) throw new Error('Ajoutez un libellé.');
+    if (description.length > MAX_DESCRIPTION_LENGTH) throw new Error('Libellé trop long.');
 
     const category = String(formData.get('category') ?? 'other');
     const payerId = String(formData.get('payerId') ?? user.id);
+
+    // `max={today()}` sur le champ n'engage que le navigateur : sans ce contrôle,
+    // une date inexistante remontait jusqu'à Postgres et son erreur brute
+    // s'affichait à l'utilisateur.
+    //
+    // La borne haute tolère un jour : le formulaire pré-remplit la date dans le
+    // fuseau du téléphone, le serveur tourne en UTC. Sans cette marge, un coloc en
+    // France se verrait refuser un formulaire non modifié entre minuit et 2 h.
     const spentOn = String(formData.get('spentOn') ?? '') || today();
+    if (!isIsoDate(spentOn)) throw new Error('Date invalide.');
+    if (spentOn > addDays(today(), 1)) throw new Error('La date ne peut pas être dans le futur.');
 
     // Par défaut, la dépense est partagée avec toute la colocation.
     const selected = formData.getAll('participants').map(String);

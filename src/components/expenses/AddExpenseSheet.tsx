@@ -79,7 +79,7 @@ export function AddExpenseSheet({
         </div>
 
         <Field label="C’était pour quoi ?">
-          <Input name="description" placeholder="Courses de la semaine" required />
+          <Input name="description" placeholder="Courses de la semaine" required maxLength={120} />
         </Field>
 
         <div>

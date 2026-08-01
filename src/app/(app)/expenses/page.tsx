@@ -49,9 +49,17 @@ async function AddExpenseTrigger({ defaultOpen }: { defaultOpen: boolean }) {
 
 async function ExpensesContent() {
   const { household, user, members } = await requireHouseholdContext();
-  const expenses = await listExpenses(household.id, { limit: 200 });
+  const currentMonth = monthKey(today());
 
-  const thisMonth = expenses.filter((expense) => monthKey(expense.spentOn) === monthKey(today()));
+  // Deux lectures distinctes : la liste est plafonnée pour l'affichage, le total
+  // du mois ne peut pas l'être — le calculer sur une liste tronquée donnerait un
+  // total faux dès qu'un mois dépasse le plafond.
+  const [expenses, monthExpenses] = await Promise.all([
+    listExpenses(household.id, { limit: 200 }),
+    listExpenses(household.id, { from: `${currentMonth}-01` }),
+  ]);
+
+  const thisMonth = monthExpenses.filter((expense) => monthKey(expense.spentOn) === currentMonth);
   const totalCents = thisMonth.reduce((total, expense) => total + expense.amountCents, 0);
   const myShareCents = thisMonth.reduce(
     (total, expense) =>

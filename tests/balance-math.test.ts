@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { computeBalances, simplifyDebts } from '@/lib/domain/balance-math';
+import { balancesFromTotals, computeBalances, simplifyDebts } from '@/lib/domain/balance-math';
 import { splitEvenly } from '@/lib/money';
 
 const [ana, bob, cleo] = ['ana', 'bob', 'cleo'];
@@ -88,4 +88,57 @@ test('un ancien coloc absent de la liste des membres est pris en compte', () => 
     balances.reduce((sum, balance) => sum + balance.netCents, 0),
     0,
   );
+});
+
+/**
+ * `balancesFromTotals` est le chemin réellement emprunté en production : les
+ * totaux arrivent agrégés par `household_balances()`. Les tests ci-dessus
+ * couvrent le modèle, ceux-ci couvrent la jonction avec l'agrégation SQL.
+ */
+
+test('balancesFromTotals reprend le calcul de computeBalances', () => {
+  const expenses = [shared(ana, 6000), shared(bob, 3000), shared(cleo, 1501, [ana, cleo])];
+  const settlements = [{ fromUserId: bob, toUserId: ana, amountCents: 500 }];
+
+  const reference = computeBalances(members, expenses, settlements);
+  const totals = reference.map(({ netCents: _ignored, ...total }) => total);
+
+  assert.deepEqual(balancesFromTotals(members, totals), reference);
+});
+
+test('un membre sans aucune activité apparaît à zéro', () => {
+  const balances = balancesFromTotals(members, [
+    { userId: ana, paidCents: 3000, owedCents: 1000, settledOutCents: 0, settledInCents: 0 },
+  ]);
+
+  assert.equal(balances.length, 3);
+  const cleoBalance = balances.find((balance) => balance.userId === cleo);
+  assert.ok(cleoBalance);
+  assert.equal(cleoBalance.netCents, 0);
+});
+
+test('une personne absente des membres est ajoutée aux soldes', () => {
+  const balances = balancesFromTotals(
+    [ana],
+    [
+      { userId: ana, paidCents: 0, owedCents: 1000, settledOutCents: 0, settledInCents: 0 },
+      { userId: 'parti', paidCents: 1000, owedCents: 0, settledOutCents: 0, settledInCents: 0 },
+    ],
+  );
+
+  assert.equal(balances.length, 2);
+  assert.equal(
+    balances.reduce((sum, balance) => sum + balance.netCents, 0),
+    0,
+  );
+});
+
+test('les remboursements déplacent le solde dans le bon sens', () => {
+  const [balance] = balancesFromTotals(
+    [ana],
+    [{ userId: ana, paidCents: 0, owedCents: 0, settledOutCents: 700, settledInCents: 200 }],
+  );
+
+  // Avoir versé 700 et reçu 200 laisse 500 d'avance en faveur d'Ana.
+  assert.equal(balance.netCents, 500);
 });

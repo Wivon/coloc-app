@@ -26,7 +26,18 @@ export function useFormAction<T>(
   const [error, setError] = useState<string | null>(null);
 
   async function submit(formData: FormData): Promise<void> {
-    const result = await action(formData);
+    // `attempt` ne convertit que ce qui est levé *dans* l'action. Une réponse
+    // perdue ou une erreur de transport rejette ici : sans ce `catch`, la
+    // soumission échouait sans rien afficher, et l'utilisateur renvoyait le
+    // formulaire en croyant que rien n'avait été enregistré.
+    let result: ActionResult<T>;
+    try {
+      result = await action(formData);
+    } catch {
+      setError('Envoi impossible. Vérifie ta connexion et réessaie.');
+      return;
+    }
+
     if (!result.ok) {
       setError(result.error);
       return;

@@ -30,10 +30,22 @@ npm run dev
 
 ### Base de données
 
-Appliquez `supabase/migrations/0001_init.sql` sur le projet Supabase (SQL Editor,
-ou `supabase db push`). Toutes les tables ont RLS activé **sans aucune policy** :
-seule la clé `service_role`, utilisée côté serveur, y accède. L'autorisation est
-faite explicitement dans `src/lib/domain/`.
+Appliquez les migrations de `supabase/migrations/` **dans l'ordre des noms** sur
+le projet Supabase (SQL Editor, ou `supabase db push`). Toutes les tables ont RLS
+activé **sans aucune policy** : seule la clé `service_role`, utilisée côté
+serveur, y accède. L'autorisation est faite explicitement dans `src/lib/domain/`.
+
+Les calculs d'argent s'appuient sur des garanties portées par le schéma, pas
+seulement par le code applicatif :
+
+- une dépense et sa répartition sont écrites par `create_expense_with_shares()`,
+  en une transaction, et le trigger `expense_shares_sum_check` refuse toute
+  dépense dont les parts ne totalisent pas le montant ;
+- les soldes viennent de `household_balances()`, qui agrège en base — les
+  remonter ligne à ligne se heurtait au plafond de lignes de l'API, qui tronquait
+  l'historique en silence ;
+- `record_settlements()` écrit un lot de remboursements en une transaction, et
+  l'index unique `(household_id, client_token)` rend un rejeu inoffensif.
 
 ## Scripts
 
@@ -120,6 +132,36 @@ périmé serait le pire défaut possible pour cette app. `use cache` interdit pa
 ailleurs `cookies()`, dont dépend toute la couche domaine. Si le besoin apparaît,
 le bon candidat est `getInsights()` sur un **mois passé** : ces données-là ne
 changent plus.
+
+### Soldes et remboursements
+
+Tout l'argent est manipulé en **centimes entiers** ; le formatage n'intervient
+qu'à l'affichage. Une dépense stocke un montant par participant : `splitEvenly()`
+répartit au centime près, et le reste tourne d'une dépense à l'autre
+(`offsetFromId`) pour que ce ne soit pas toujours le même coloc qui absorbe
+l'arrondi.
+
+Le solde d'un coloc vaut `avancé − sa part + remboursé − reçu`. Un remboursement
+ne supprime donc aucune dépense : il entre dans le calcul, ce qui garde
+l'historique complet et réversible. `simplifyDebts()` réduit ensuite les soldes au
+plus petit nombre de virements — au plus n−1 pour n colocs.
+
+Les deux façons d'enregistrer un remboursement n'ont **pas** la même règle, et
+c'est délibéré :
+
+- **« Payé » sur un virement** enregistre le montant *affiché*. En tapant sous
+  « À Bob · 12,00 € », l'utilisateur déclare avoir viré 12 € — ce qui reste vrai
+  si un coloc a ajouté une dépense entre-temps. Le recalculer enregistrerait une
+  somme qu'il n'a jamais versée. Le montant est en revanche revalidé côté serveur.
+- **« Tout régler » recalcule**, parce que l'intention est « solder ce que je dois
+  maintenant », pas un montant précis.
+
+D'où deux protections différentes contre le doublon. Le premier chemin porte un
+**jeton d'intention** (`lib/client-token.ts`), propre au bouton et renouvelé
+seulement après un succès : un double tap met à jour la ligne déjà écrite.
+Le second n'en a pas besoin — après un premier succès il ne reste plus rien à
+solder — et en réutiliser un serait dangereux, puisque l'ensemble des virements a
+pu changer entre les deux tentatives.
 
 ### Répartition automatique des tâches
 

@@ -9,6 +9,7 @@ import { Chip } from '@/components/ui/Chip';
 import { Field, FormError, Input } from '@/components/ui/Field';
 import { Sheet } from '@/components/ui/Sheet';
 import { SubmitButton } from '@/components/ui/SubmitButton';
+import { newClientToken } from '@/lib/client-token';
 import { centsToInput } from '@/lib/money';
 import { useFormAction } from '@/lib/use-form-action';
 import type { Transfer } from '@/lib/domain/balance-math';
@@ -30,6 +31,8 @@ export function SettleSheet({
 }) {
   const [toUserId, setToUserId] = useState(members[0]?.id ?? '');
   const [amount, setAmount] = useState('');
+  // Tiré une fois à l'ouverture : renvoyer le formulaire ne crée pas un doublon.
+  const [clientToken] = useState(newClientToken);
 
   const { submit, error } = useFormAction(settleAction, onClose);
 
@@ -51,6 +54,8 @@ export function SettleSheet({
       description="Le montant est déduit de ton solde, rien n’est supprimé de l’historique."
     >
       <form action={submit} className="flex flex-col gap-5">
+        <input type="hidden" name="clientToken" value={clientToken} />
+
         <div>
           <p className="mb-2 text-[13px] font-medium text-muted">À qui ?</p>
           <input type="hidden" name="toUserId" value={toUserId} />

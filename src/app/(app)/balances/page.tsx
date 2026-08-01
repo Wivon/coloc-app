@@ -3,6 +3,7 @@ import { Suspense } from 'react';
 
 import { AppHeader } from '@/components/AppHeader';
 import { BalancesView } from '@/components/balances/BalancesView';
+import { DeleteSettlementButton } from '@/components/balances/DeleteSettlementButton';
 import { Amount } from '@/components/ui/Amount';
 import { CardList, SectionTitle } from '@/components/ui/Card';
 import { BalancesContentSkeleton } from '@/components/PageSkeletons';
@@ -71,6 +72,7 @@ async function BalancesContent() {
                   currency={household.currency}
                   tone="muted"
                 />
+                <DeleteSettlementButton settlementId={settlement.id} />
               </div>
             ))}
           </CardList>
