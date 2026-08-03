@@ -83,6 +83,24 @@ export function formatMoney(
   return `${cents > 0 ? '+' : '−'}${formatted}`;
 }
 
+/**
+ * Montant abrégé pour les graphiques : « 68 € », « 407 € », « 1,2 k€ ».
+ *
+ * Les centimes sautent, faute de place — six colonnes sur la largeur d'un
+ * téléphone laissent une quarantaine de pixels chacune, où « 407,32 € » ne tient
+ * pas. Le total exact reste affiché en toutes lettres au-dessus du graphique.
+ */
+export function formatMoneyCompact(cents: number, currency = 'EUR'): string {
+  return new Intl.NumberFormat('fr-FR', {
+    style: 'currency',
+    currency,
+    notation: 'compact',
+    // Sous 1 000 €, l'entier suffit. Au-delà, une décimale évite d'afficher
+    // « 1 k€ » aussi bien pour 1 000 € que pour 1 900 €.
+    maximumFractionDigits: Math.abs(cents) >= 100_000 ? 1 : 0,
+  }).format(cents / 100);
+}
+
 /** Montant sans symbole, pour les champs de saisie. */
 export function centsToInput(cents: number): string {
   return (cents / 100).toFixed(2).replace('.', ',');

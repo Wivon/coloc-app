@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import {
   MAX_AMOUNT_CENTS,
   formatMoney,
+  formatMoneyCompact,
   isValidAmountCents,
   offsetFromId,
   parseAmountToCents,
@@ -106,6 +107,25 @@ test('isValidAmountCents filtre ce qui vient du client', () => {
     assert.equal(isValidAmountCents(value), false, String(value));
   }
 });
+
+test('formatMoneyCompact tient dans une colonne de graphique', () => {
+  // Sous 1 000 €, pas de décimale — c'est ce qui fait tenir « 407 € » là où
+  // « 407,32 € » débordait sur la colonne voisine.
+  assert.equal(strip(formatMoneyCompact(0)), '0 €');
+  assert.equal(strip(formatMoneyCompact(6752)), '68 €');
+  assert.equal(strip(formatMoneyCompact(40732)), '407 €');
+
+  // Au-delà, l'abréviation reprend une décimale pour rester informative.
+  assert.equal(strip(formatMoneyCompact(123456)), '1,2 k €');
+  assert.equal(strip(formatMoneyCompact(1234567)), '12,3 k €');
+
+  for (const cents of [0, 152, 6752, 40732, 123456, 9_999_999_99]) {
+    assert.ok(formatMoneyCompact(cents).length <= 10, formatMoneyCompact(cents));
+  }
+});
+
+/** `Intl` sépare avec des espaces insécables : on compare sur des espaces simples. */
+const strip = (value: string) => value.replace(/ | /g, ' ');
 
 test('formatMoney affiche le signe demandé', () => {
   assert.match(formatMoney(1250), /12,50/);

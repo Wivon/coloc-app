@@ -1,10 +1,13 @@
 import { cn } from '@/lib/cn';
 import { formatMonthShort } from '@/lib/date';
-import { formatMoney } from '@/lib/money';
+import { formatMoneyCompact } from '@/lib/money';
 
 /**
  * Histogramme des six derniers mois. Construit en flex plutôt qu'en SVG : il
  * reste net à toutes les largeurs et hérite des couleurs du thème.
+ *
+ * Chaque mois porte son montant, abrégé : à cette largeur de colonne, un montant
+ * au centime près déborderait sur ses voisins.
  */
 export function TrendChart({
   data,
@@ -31,11 +34,11 @@ export function TrendChart({
           <div key={point.month} className="flex flex-1 flex-col items-center gap-1.5">
             <span
               className={cn(
-                'text-[10px] tabular transition',
-                active ? 'text-ink' : 'text-transparent',
+                'whitespace-nowrap text-[10px] leading-none tabular transition',
+                active ? 'font-medium text-ink' : 'text-subtle',
               )}
             >
-              {formatMoney(point.amountCents, currency, { compact: true })}
+              {formatMoneyCompact(point.amountCents, currency)}
             </span>
             {/* `min-h-0` : sans lui, la hauteur minimale automatique d'un élément
                 flex l'empêche de se réduire, et la colonne déborde du graphique. */}
