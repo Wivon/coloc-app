@@ -29,7 +29,6 @@ export interface Insights {
   /** Variation vs mois précédent, `null` si le mois précédent est vide. */
   changeRatio: number | null;
   expenseCount: number;
-  averageExpenseCents: number;
   dailyAverageCents: number;
   byCategory: CategorySlice[];
   byMember: MemberSpending[];
@@ -65,7 +64,6 @@ export async function getInsights(
     previousTotalCents,
     changeRatio: previousTotalCents > 0 ? (totalCents - previousTotalCents) / previousTotalCents : null,
     expenseCount: inMonth.length,
-    averageExpenseCents: inMonth.length ? Math.round(totalCents / inMonth.length) : 0,
     dailyAverageCents: elapsedDays ? Math.round(totalCents / elapsedDays) : 0,
     byCategory: groupByCategory(inMonth, totalCents),
     byMember: groupByMember(inMonth, memberIds),

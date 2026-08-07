@@ -38,7 +38,7 @@ export default async function InsightsPage(props: PageProps<'/insights'>) {
 }
 
 async function InsightsContent({ month }: { month: string }) {
-  const { household, members } = await requireHouseholdContext();
+  const { household, user, members } = await requireHouseholdContext();
   const insights = await getInsights(
     household.id,
     members.map((member) => member.id),
@@ -47,6 +47,11 @@ async function InsightsContent({ month }: { month: string }) {
 
   const currency = household.currency;
   const membersById = new Map(members.map((member) => [member.id, member]));
+
+  // Même somme que « Ma part » sur l'écran Dépenses — le total des parts de
+  // l'utilisateur — mais sur le mois affiché ici, pas forcément le mois courant.
+  const myShareCents =
+    insights.byMember.find((entry) => entry.userId === user.id)?.shareCents ?? 0;
 
   return (
     <>
@@ -95,8 +100,8 @@ async function InsightsContent({ month }: { month: string }) {
             <div className="grid grid-cols-3 gap-2">
               <Stat label="Dépenses" value={String(insights.expenseCount)} />
               <Stat
-                label="Par dépense"
-                value={formatMoney(insights.averageExpenseCents, currency, { compact: true })}
+                label="Ma part"
+                value={formatMoney(myShareCents, currency, { compact: true })}
               />
               <Stat
                 label="Par jour"
