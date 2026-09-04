@@ -55,7 +55,12 @@ export const requireHouseholdContext = cache(async (): Promise<HouseholdContext>
   return { user, household, members: await listMembers(household.id) };
 });
 
-async function resolveHousehold(user: UserRow): Promise<HouseholdRow | null> {
+/**
+ * Colocation courante d'un utilisateur, sans redirection — utilisable hors
+ * navigation (endpoint MCP, cron). Retombe sur la première coloc rejointe si le
+ * pointeur `current_household_id` est vide ou périmé.
+ */
+export async function resolveHousehold(user: UserRow): Promise<HouseholdRow | null> {
   if (user.current_household_id) {
     const { data } = await db()
       .from('household_members')

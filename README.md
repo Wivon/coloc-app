@@ -8,6 +8,8 @@ d'accueil, connexion par passkey.
 - **Dépenses** : partagées avec toute la coloc par défaut, ou avec une sélection.
 - **Comptes** : soldes en direct et remboursements réduits au minimum de virements.
 - **Insights** : dépenses par mois, catégorie et coloc.
+- **MCP** : chaque coloc branche son assistant IA sur un lien personnel et lui
+  fait saisir dépenses, remboursements et tâches.
 
 ## Démarrer
 
@@ -66,12 +68,14 @@ src/
     (app)/             Pages authentifiées (coquille + barre d'onglets)
     api/auth/          Cérémonies WebAuthn (passkeys)
     api/cron/          Rappels quotidiens
+    api/mcp/[token]/   Endpoint MCP personnel (assistants IA)
   actions/             Server Actions, une par domaine
   components/          UI — `ui/` = primitives réutilisables
   lib/
     auth/              Sessions (JWT en cookie) et passkeys
     db/                Client Supabase + types du schéma
     domain/            Règles métier ; `*-math.ts` = logique pure et testée
+    mcp/               Serveur MCP : protocole, lecture des arguments, outils
 supabase/migrations/   Schéma SQL
 ```
 
@@ -183,6 +187,53 @@ serveur émet un challenge WebAuthn (`/api/auth/*/options`) et le vérifie
 
 Les passkeys sont liées au domaine exact de `NEXT_PUBLIC_APP_URL` : une passkey
 créée sur `localhost` ne fonctionnera pas en production, et inversement.
+
+### Connecter un assistant (MCP)
+
+Chaque coloc dispose dans ses réglages d'un lien d'endpoint MCP personnel, à
+coller comme connecteur dans Claude (ou tout autre client MCP) :
+
+```
+https://votre-domaine/api/mcp/mcp_<jeton>
+```
+
+L'assistant peut alors ajouter une dépense, enregistrer un remboursement, lire
+les soldes et les virements dus, sortir les stats du mois, et gérer les tâches —
+seize outils, tous branchés sur la **même couche domaine** que l'interface. Mêmes
+règles, mêmes garanties d'intégrité, mêmes notifications aux colocs : rien ne
+contourne `lib/domain/`.
+
+Trois choix structurent l'implémentation :
+
+- **Le jeton est l'authentification.** Un connecteur MCP distant appelle depuis
+  l'infrastructure de l'assistant, sans cookie de session ni passkey : le jeton du
+  chemin est la seule preuve d'identité. Il est tiré sur 32 octets aléatoires et
+  se régénère en un bouton — l'ancien lien meurt aussitôt. Il est stocké en clair
+  parce que l'écran de réglages doit pouvoir le réafficher ; le contre-poids est
+  la révocation, pas le secret du stockage.
+- **Aucun identifiant de colocation ne transite.** Les outils lisent la coloc du
+  porteur du jeton, jamais un argument. L'isolation est donc structurelle : il n'y
+  a pas d'appel possible « chez le voisin », même mal formé.
+- **Le transport est réduit au minimum.** « Streamable HTTP » sans flux SSE : un
+  POST JSON-RPC, une réponse JSON, aucune session à tenir entre deux appels — ce
+  qui convient à une fonction serverless, où un état en mémoire ne survivrait de
+  toute façon pas au déploiement suivant. `lib/mcp/protocol.ts` n'a aucune I/O et
+  est testé ; le SDK officiel, lui, suppose un serveur Node de longue durée.
+
+Un modèle écrit « Marc », « moi », « 24,50 € » — pas des UUID.
+`lib/mcp/inputs.ts` ramène ces valeurs à ce que le domaine accepte, et refuse
+plutôt que de deviner : un préfixe qui désigne deux colocs lève une erreur au lieu
+d'enregistrer la dépense sur l'un des deux au hasard. Un outil qui échoue renvoie
+un **résultat** marqué `isError`, pas une erreur de protocole : le modèle lit le
+message, corrige ses arguments et réessaie.
+
+Test rapide du lien, une fois la migration appliquée :
+
+```bash
+curl -X POST https://votre-domaine/api/mcp/mcp_<jeton> \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+```
 
 ### Notifications push
 

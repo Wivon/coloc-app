@@ -146,6 +146,14 @@ export type SettlementInput = {
   client_token: Uuid | null;
 };
 
+/** Jeton d'endpoint MCP personnel — voir `lib/domain/mcp-tokens.ts`. */
+export type McpTokenRow = {
+  user_id: Uuid;
+  token: string;
+  created_at: IsoTimestamp;
+  last_used_at: IsoTimestamp | null;
+};
+
 export type PushSubscriptionRow = {
   id: Uuid;
   user_id: Uuid;
@@ -197,6 +205,7 @@ export type Database = {
       expense_shares: TableDef<ExpenseShareRow>;
       settlements: TableDef<SettlementRow, 'settled_on' | 'client_token'>;
       push_subscriptions: TableDef<PushSubscriptionRow>;
+      mcp_tokens: TableDef<McpTokenRow>;
     };
     Views: Record<string, never>;
     Functions: {

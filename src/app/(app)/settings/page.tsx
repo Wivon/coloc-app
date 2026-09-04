@@ -3,18 +3,23 @@ import type { Metadata } from 'next';
 import { PageHeader } from '@/components/PageHeader';
 import { HouseholdCard } from '@/components/settings/HouseholdCard';
 import { InviteCard } from '@/components/settings/InviteCard';
+import { McpCard } from '@/components/settings/McpCard';
 import { NotificationsCard } from '@/components/settings/NotificationsCard';
 import { PasskeysCard } from '@/components/settings/PasskeysCard';
 import { ProfileCard } from '@/components/settings/ProfileCard';
 import { SignOutButton } from '@/components/settings/SignOutButton';
 import { listCredentials } from '@/lib/auth/passkeys';
 import { requireHouseholdContext } from '@/lib/domain/households';
+import { getOrCreateMcpToken, mcpEndpointUrl } from '@/lib/domain/mcp-tokens';
 
 export const metadata: Metadata = { title: 'Réglages' };
 
 export default async function SettingsPage() {
   const { household, user, members } = await requireHouseholdContext();
-  const credentials = await listCredentials(user.id);
+  const [credentials, mcpToken] = await Promise.all([
+    listCredentials(user.id),
+    getOrCreateMcpToken(user.id),
+  ]);
 
   return (
     <>
@@ -33,6 +38,8 @@ export default async function SettingsPage() {
         <InviteCard inviteCode={household.invite_code} householdName={household.name} />
 
         <HouseholdCard name={household.name} members={members} />
+
+        <McpCard endpointUrl={mcpEndpointUrl(mcpToken)} />
 
         <PasskeysCard
           passkeys={credentials.map((credential) => ({
