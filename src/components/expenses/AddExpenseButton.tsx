@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-import { AddExpenseSheet } from './AddExpenseSheet';
+import { ExpenseSheet } from './ExpenseSheet';
 import { PlusButton } from '@/components/ui/PlusButton';
 import type { Member } from '@/lib/domain/households';
 
@@ -26,7 +26,7 @@ export function AddExpenseButton({
       {/* Montage conditionnel : la feuille repart d'un état vierge à chaque
           ouverture, et aucun état de soumission ne peut survivre à sa fermeture. */}
       {open ? (
-        <AddExpenseSheet
+        <ExpenseSheet
           onClose={() => setOpen(false)}
           members={members}
           currentUserId={currentUserId}

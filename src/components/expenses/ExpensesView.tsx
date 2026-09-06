@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from 'react';
 
 import { deleteExpenseAction } from '@/actions/expenses';
+import { ExpenseSheet } from './ExpenseSheet';
 import { Amount } from '@/components/ui/Amount';
 import { Avatar, AvatarStack } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
@@ -27,6 +28,9 @@ export function ExpensesView({
   currency: string;
 }) {
   const [selected, setSelected] = useState<Expense | null>(null);
+  // La correction remplace le détail plutôt que de s'empiler dessus : deux
+  // feuilles superposées laisseraient l'utilisateur avec deux « Annuler ».
+  const [editing, setEditing] = useState<Expense | null>(null);
 
   const membersById = useMemo(
     () => new Map(members.map((member) => [member.id, member])),
@@ -151,13 +155,38 @@ export function ExpensesView({
               </ul>
             </div>
 
-            <DeleteExpenseButton
-              expenseId={selected.id}
-              onDeleted={() => setSelected(null)}
-            />
+            <div className="flex flex-col gap-2">
+              <Button
+                variant="secondary"
+                size="lg"
+                onClick={() => {
+                  setEditing(selected);
+                  setSelected(null);
+                }}
+              >
+                Modifier la dépense
+              </Button>
+
+              <DeleteExpenseButton
+                expenseId={selected.id}
+                onDeleted={() => setSelected(null)}
+              />
+            </div>
           </div>
         )}
       </Sheet>
+
+      {/* Montée à l'ouverture seulement : la feuille repart des valeurs de la
+          dépense affichée, sans état de saisie hérité de la précédente. */}
+      {editing ? (
+        <ExpenseSheet
+          expense={editing}
+          onClose={() => setEditing(null)}
+          members={members}
+          currentUserId={currentUserId}
+          currency={currency}
+        />
+      ) : null}
     </div>
   );
 }

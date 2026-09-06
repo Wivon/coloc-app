@@ -86,7 +86,15 @@ export function Sheet({
           </button>
         </header>
 
-        <div className="safe-bottom overflow-y-auto px-5 pb-5 pt-4">{children}</div>
+        {/*
+          `overflow-x-hidden` n'est pas décoratif : dès qu'un axe n'est plus
+          `visible`, l'autre passe de `visible` à `auto` (CSS Overflow 3). Le seul
+          `overflow-y-auto` rendait donc la feuille scrollable horizontalement au
+          moindre enfant trop large — un axe de défilement qu'aucun écran n'utilise.
+        */}
+        <div className="safe-bottom overflow-y-auto overflow-x-hidden px-5 pb-5 pt-4">
+          {children}
+        </div>
       </div>
     </div>,
     document.body,

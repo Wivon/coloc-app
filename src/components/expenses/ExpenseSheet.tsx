@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-import { addExpenseAction } from '@/actions/expenses';
+import { addExpenseAction, updateExpenseAction } from '@/actions/expenses';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
@@ -12,34 +12,59 @@ import { SubmitButton } from '@/components/ui/SubmitButton';
 import { EXPENSE_CATEGORIES } from '@/lib/categories';
 import { cn } from '@/lib/cn';
 import { today } from '@/lib/date';
-import { formatMoney, parseAmountToCents, splitEvenly } from '@/lib/money';
+import { centsToInput, formatMoney, parseAmountToCents, splitEvenly } from '@/lib/money';
 import { useFormAction } from '@/lib/use-form-action';
+import type { Expense } from '@/lib/domain/expenses';
 import type { Member } from '@/lib/domain/households';
 
 /**
- * Monté uniquement quand la feuille est ouverte (voir `AddExpenseButton`) : la
- * saisie repart donc de zéro à chaque ouverture, sans code de remise à zéro.
+ * Longueur maximale du montant saisi : « 99999999,99 ». Sans plafond, le champ
+ * — dont la largeur suit le nombre de caractères — finissait par dépasser la
+ * feuille, et `parseAmountToCents` refusait de toute façon la valeur.
  */
-export function AddExpenseSheet({
+const MAX_AMOUNT_LENGTH = 11;
+
+/**
+ * Saisie d'une dépense : nouvelle si `expense` est absent, correction sinon.
+ *
+ * Les deux écrans remplissent exactement les mêmes champs — une correction qui
+ * s'ouvrirait sur un formulaire réduit obligerait à supprimer puis ressaisir dès
+ * qu'on veut toucher au partage. Un seul composant, donc, et les valeurs
+ * initiales font toute la différence.
+ *
+ * Monté uniquement quand la feuille est ouverte (voir `AddExpenseButton` et
+ * `ExpensesView`) : la saisie repart de la dépense affichée à chaque ouverture,
+ * sans code de remise à zéro.
+ */
+export function ExpenseSheet({
+  expense,
   onClose,
   members,
   currentUserId,
   currency,
 }: {
+  /** Dépense à corriger. Absente : on en crée une. */
+  expense?: Expense;
   onClose: () => void;
   members: Member[];
   currentUserId: string;
   currency: string;
 }) {
+  const editing = expense !== undefined;
   const allIds = members.map((member) => member.id);
 
-  const [amount, setAmount] = useState('');
-  const [category, setCategory] = useState<string>('courses');
-  const [payerId, setPayerId] = useState(currentUserId);
+  const [amount, setAmount] = useState(expense ? centsToInput(expense.amountCents) : '');
+  const [category, setCategory] = useState<string>(expense?.category ?? 'courses');
+  const [payerId, setPayerId] = useState(expense?.payerId ?? currentUserId);
   // Par défaut, tout le monde partage.
-  const [participants, setParticipants] = useState<string[]>(allIds);
+  const [participants, setParticipants] = useState<string[]>(() =>
+    expense ? initialParticipants(expense, allIds) : allIds,
+  );
 
-  const { submit, error } = useFormAction(addExpenseAction, onClose);
+  const { submit, error } = useFormAction(
+    editing ? updateExpenseAction : addExpenseAction,
+    onClose,
+  );
 
   const amountCents = parseAmountToCents(amount) ?? 0;
   const shareCents =
@@ -52,18 +77,26 @@ export function AddExpenseSheet({
   }
 
   return (
-    <Sheet open onClose={onClose} title="Nouvelle dépense">
+    <Sheet open onClose={onClose} title={editing ? 'Modifier la dépense' : 'Nouvelle dépense'}>
       <form action={submit} className="flex flex-col gap-5">
+        {expense && <input type="hidden" name="expenseId" value={expense.id} />}
+
         <div className="flex flex-col items-center gap-1 pb-1">
-          <div className="flex items-baseline gap-1">
+          {/* `max-w-full` + `min-w-0` sur le champ : sur un petit écran, un
+              montant long rétrécit le champ et défile dedans, au lieu de pousser
+              la feuille au-delà de sa largeur. */}
+          <div className="flex max-w-full items-baseline gap-1">
             <input
               name="amount"
               value={amount}
               onChange={(event) => setAmount(event.target.value)}
               inputMode="decimal"
               placeholder="0,00"
-              autoFocus
+              // Sur une correction, la feuille s'ouvre pour être relue : ouvrir le
+              // clavier d'emblée masquerait la moitié du formulaire.
+              autoFocus={!editing}
               required
+              maxLength={MAX_AMOUNT_LENGTH}
               aria-label="Montant"
               className="w-[5.5ch] min-w-0 border-none bg-transparent text-center text-[40px] font-semibold tabular text-ink outline-none placeholder:text-subtle"
               style={{ width: `${Math.max(4, amount.length + 1)}ch` }}
@@ -79,7 +112,13 @@ export function AddExpenseSheet({
         </div>
 
         <Field label="C’était pour quoi ?">
-          <Input name="description" placeholder="Courses de la semaine" required maxLength={120} />
+          <Input
+            name="description"
+            placeholder="Courses de la semaine"
+            defaultValue={expense?.description}
+            required
+            maxLength={120}
+          />
         </Field>
 
         <div>
@@ -169,13 +208,20 @@ export function AddExpenseSheet({
         </div>
 
         <Field label="Date">
-          <Input type="date" name="spentOn" defaultValue={today()} max={today()} />
+          <Input
+            type="date"
+            name="spentOn"
+            defaultValue={expense?.spentOn ?? today()}
+            max={today()}
+          />
         </Field>
 
         <FormError>{error}</FormError>
 
         <div className="flex flex-col gap-2">
-          <SubmitButton pendingLabel="Enregistrement…">Ajouter la dépense</SubmitButton>
+          <SubmitButton pendingLabel="Enregistrement…">
+            {editing ? 'Enregistrer les modifications' : 'Ajouter la dépense'}
+          </SubmitButton>
           <Button type="button" variant="ghost" size="lg" onClick={onClose}>
             Annuler
           </Button>
@@ -183,4 +229,18 @@ export function AddExpenseSheet({
       </form>
     </Sheet>
   );
+}
+
+/**
+ * Participants pré-cochés d'une dépense à corriger.
+ *
+ * Les parts d'un ancien coloc survivent à son départ (`on delete restrict` sur
+ * `expense_shares.user_id`) : les renvoyer telles quelles ferait échouer
+ * l'enregistrement sur « Participant inconnu ». On ne garde que les membres
+ * actuels, et une dépense qui ne concernait plus personne repart de toute la coloc.
+ */
+function initialParticipants(expense: Expense, memberIds: string[]): string[] {
+  const known = new Set(memberIds);
+  const kept = expense.shares.map((share) => share.userId).filter((id) => known.has(id));
+  return kept.length > 0 ? kept : memberIds;
 }

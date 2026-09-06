@@ -130,7 +130,7 @@ export type HouseholdBalanceRow = {
   settled_in_cents: number;
 };
 
-/** Entrée de `create_expense_with_shares()`. */
+/** Entrée de `create_expense_with_shares()` et `update_expense_with_shares()`. */
 export type ShareInput = {
   user_id: Uuid;
   amount_cents: number;
@@ -223,6 +223,19 @@ export type Database = {
           p_category: string;
           p_spent_on: IsoDate;
           p_created_by: Uuid;
+          p_shares: ShareInput[];
+        };
+        Returns: ExpenseRow;
+      };
+      update_expense_with_shares: {
+        Args: {
+          p_id: Uuid;
+          p_household_id: Uuid;
+          p_payer_id: Uuid;
+          p_amount_cents: number;
+          p_description: string;
+          p_category: string;
+          p_spent_on: IsoDate;
           p_shares: ShareInput[];
         };
         Returns: ExpenseRow;

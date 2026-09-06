@@ -167,6 +167,48 @@ export async function createExpense(
   return toExpense({ ...expense, expense_shares: shares });
 }
 
+/**
+ * Réécrit une dépense et sa répartition, en une seule transaction.
+ *
+ * Le décalage d'arrondi reste dérivé de l'identifiant, qui ne change pas :
+ * modifier la date ou le libellé d'une dépense ne déplace donc pas le centime
+ * en trop d'un coloc à l'autre.
+ */
+export async function updateExpense(
+  householdId: Uuid,
+  expenseId: Uuid,
+  input: NewExpenseInput,
+): Promise<Expense> {
+  const participants = dedupe(input.participantIds);
+  if (participants.length === 0) throw new Error('Sélectionnez au moins un coloc.');
+  if (!isValidAmountCents(input.amountCents)) throw new Error('Montant invalide.');
+
+  const amounts = splitEvenly(
+    input.amountCents,
+    participants.length,
+    offsetFromId(expenseId, participants.length),
+  );
+  const shares = participants.map((userId, index) => ({
+    user_id: userId,
+    amount_cents: amounts[index],
+  }));
+
+  const expense = unwrap(
+    await db().rpc('update_expense_with_shares', {
+      p_id: expenseId,
+      p_household_id: householdId,
+      p_payer_id: input.payerId,
+      p_amount_cents: input.amountCents,
+      p_description: input.description,
+      p_category: input.category,
+      p_spent_on: input.spentOn || today(),
+      p_shares: shares,
+    }),
+  );
+
+  return toExpense({ ...expense, expense_shares: shares });
+}
+
 export async function deleteExpense(householdId: Uuid, expenseId: Uuid): Promise<void> {
   const deleted = unwrap(
     await db()
