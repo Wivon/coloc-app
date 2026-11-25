@@ -146,6 +146,14 @@ export type SettlementInput = {
   client_token: Uuid | null;
 };
 
+/** Jeton d'API personnelle — voir `lib/domain/api-tokens.ts`. Même forme que `McpTokenRow`. */
+export type ApiTokenRow = {
+  user_id: Uuid;
+  token: string;
+  created_at: IsoTimestamp;
+  last_used_at: IsoTimestamp | null;
+};
+
 /** Jeton d'endpoint MCP personnel — voir `lib/domain/mcp-tokens.ts`. */
 export type McpTokenRow = {
   user_id: Uuid;
@@ -206,6 +214,7 @@ export type Database = {
       settlements: TableDef<SettlementRow, 'settled_on' | 'client_token'>;
       push_subscriptions: TableDef<PushSubscriptionRow>;
       mcp_tokens: TableDef<McpTokenRow>;
+      api_tokens: TableDef<ApiTokenRow>;
     };
     Views: Record<string, never>;
     Functions: {

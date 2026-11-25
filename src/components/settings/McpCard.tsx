@@ -5,6 +5,7 @@ import { useState, useTransition } from 'react';
 import { regenerateMcpLinkAction } from '@/actions/mcp';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { useCopy } from '@/lib/use-copy';
 
 /**
  * Lien d'endpoint MCP personnel, à coller dans les réglages d'un assistant.
@@ -16,20 +17,15 @@ import { Card } from '@/components/ui/Card';
 export function McpCard({ endpointUrl }: { endpointUrl: string }) {
   const [url, setUrl] = useState(endpointUrl);
   const [revealed, setRevealed] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const { copy: copyText, copied, reset } = useCopy();
 
   async function copy() {
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Presse-papiers refusé (contexte non sécurisé) : reste le lien à l'écran.
-      setRevealed(true);
-      setError('Copie impossible : sélectionnez le lien à la main.');
-    }
+    if (await copyText(url)) return setError(null);
+    // Presse-papiers refusé (contexte non sécurisé) : reste le lien à l'écran.
+    setRevealed(true);
+    setError('Copie impossible : sélectionnez le lien à la main.');
   }
 
   function regenerate() {
@@ -43,7 +39,7 @@ export function McpCard({ endpointUrl }: { endpointUrl: string }) {
       }
       setUrl(result.data);
       setError(null);
-      setCopied(false);
+      reset();
     });
   }
 

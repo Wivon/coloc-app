@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
 import { PageHeader } from '@/components/PageHeader';
+import { ApiCard } from '@/components/settings/ApiCard';
 import { HouseholdCard } from '@/components/settings/HouseholdCard';
 import { InviteCard } from '@/components/settings/InviteCard';
 import { McpCard } from '@/components/settings/McpCard';
@@ -10,15 +11,17 @@ import { ProfileCard } from '@/components/settings/ProfileCard';
 import { SignOutButton } from '@/components/settings/SignOutButton';
 import { listCredentials } from '@/lib/auth/passkeys';
 import { requireHouseholdContext } from '@/lib/domain/households';
+import { apiBaseUrl, getOrCreateApiToken } from '@/lib/domain/api-tokens';
 import { getOrCreateMcpToken, mcpEndpointUrl } from '@/lib/domain/mcp-tokens';
 
 export const metadata: Metadata = { title: 'Réglages' };
 
 export default async function SettingsPage() {
   const { household, user, members } = await requireHouseholdContext();
-  const [credentials, mcpToken] = await Promise.all([
+  const [credentials, mcpToken, apiToken] = await Promise.all([
     listCredentials(user.id),
     getOrCreateMcpToken(user.id),
+    getOrCreateApiToken(user.id),
   ]);
 
   return (
@@ -40,6 +43,8 @@ export default async function SettingsPage() {
         <HouseholdCard name={household.name} members={members} />
 
         <McpCard endpointUrl={mcpEndpointUrl(mcpToken)} />
+
+        <ApiCard baseUrl={apiBaseUrl()} token={apiToken} />
 
         <PasskeysCard
           passkeys={credentials.map((credential) => ({

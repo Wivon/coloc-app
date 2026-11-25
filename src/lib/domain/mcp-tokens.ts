@@ -3,6 +3,7 @@ import { after } from 'next/server';
 
 import { db, unwrap } from '@/lib/db/client';
 import { serverEnv } from '@/lib/env';
+import { randomToken } from '@/lib/random-token';
 import type { HouseholdRow, McpTokenRow, UserRow, Uuid } from '@/lib/db/types';
 import { listMembers, resolveHousehold, type Member } from './households';
 
@@ -103,12 +104,5 @@ export async function resolveMcpToken(token: string): Promise<McpIdentity | null
 }
 
 function generateToken(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(TOKEN_BYTES));
-  return PREFIX + base64url(bytes);
-}
-
-/** base64url sans dépendance : le jeton voyage dans un chemin d'URL. */
-function base64url(bytes: Uint8Array): string {
-  const binary = Array.from(bytes, (byte) => String.fromCharCode(byte)).join('');
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return randomToken(PREFIX, TOKEN_BYTES);
 }
